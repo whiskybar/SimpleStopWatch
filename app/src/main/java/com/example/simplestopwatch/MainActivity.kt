@@ -103,10 +103,10 @@ fun StopwatchScreen() {
     // Handles configuration changes by using system time as reference
     LaunchedEffect(isRunning) {
         if (isRunning) {
-            // Main timer loop - updates every second for precision
+            // Main timer loop - updates every 100ms for smooth millisecond display
             while (isRunning) {
-                delay(1000L) // 1 second intervals
-                elapsedTime += 1000L
+                delay(100L) // 100ms intervals for smooth millisecond updates
+                elapsedTime += 100L
             }
         }
     }
@@ -127,20 +127,21 @@ fun StopwatchScreen() {
         }
     }
 
-    // Format time as MM:ss or HH:MM:SS based on duration
+    // Format time as MM:SS.X or HH:MM:SS.X based on duration
     // Note: elapsedTime represents actual running time, not including pauses
     val formattedTime = remember(elapsedTime) {
         val totalSeconds = elapsedTime / 1000
         val hours = totalSeconds / 3600
         val minutes = (totalSeconds % 3600) / 60
         val seconds = totalSeconds % 60
+        val hundredsOfMs = (elapsedTime % 1000) / 100 // Hundreds of milliseconds
 
         if (hours > 0) {
-            // Format as HH:MM:SS for times over 1 hour
-            String.format("%02d:%02d:%02d", hours, minutes, seconds)
+            // Format as HH:MM:SS.X for times over 1 hour
+            String.format("%02d:%02d:%02d.%d", hours, minutes, seconds, hundredsOfMs)
         } else {
-            // Format as MM:ss for times under 1 hour
-            String.format("%02d:%02d", minutes, seconds)
+            // Format as MM:SS.X for times under 1 hour
+            String.format("%02d:%02d.%d", minutes, seconds, hundredsOfMs)
         }
     }
 
@@ -156,45 +157,16 @@ fun StopwatchScreen() {
     // Styled UI with dark theme support
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
-        bottomBar = {
-            // Reset button positioned at bottom with 16.dp padding
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 8.dp
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    FilledTonalButton(
-                        onClick = { resetTimer() },
-                        modifier = Modifier.size(56.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Reset Stopwatch",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
-        }
+        containerColor = MaterialTheme.colorScheme.surface
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
+                .padding(innerPadding)
         ) {
+            // Main content - centered time display and status
             Column(
+                modifier = Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -234,6 +206,25 @@ fun StopwatchScreen() {
                             },
                             shape = CircleShape
                         )
+                )
+            }
+
+            // Reset button positioned at bottom with navigation bar clearance
+            FilledTonalButton(
+                onClick = { resetTimer() },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp) // 32dp padding to clear navigation bar
+                    .size(56.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Reset Stopwatch",
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
