@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -72,6 +73,10 @@ fun StopwatchScreen() {
     var showIntervalDropdown by rememberSaveable { mutableStateOf(false) }
     var fabScale by rememberSaveable { mutableStateOf(1f) }
 
+    // Theme selection state
+    var selectedTheme by rememberSaveable { mutableStateOf("Dark") }
+    var showThemeDropdown by rememberSaveable { mutableStateOf(false) }
+
     // Refined click logic functions with configuration change handling
     fun startTimer() {
         isRunning = true
@@ -114,6 +119,128 @@ fun StopwatchScreen() {
         intervalSeconds = seconds
         showIntervalDropdown = false
     }
+
+    // Handle theme selection
+    fun selectTheme(theme: String) {
+        selectedTheme = theme
+        showThemeDropdown = false
+    }
+
+    // Define color schemes
+    data class AppColorScheme(
+        val name: String,
+        val background: Brush,
+        val cardColor: Color,
+        val timeRunningColor: Color,
+        val timePausedColor: Color,
+        val timeStoppedColor: Color,
+        val fabColor: Color,
+        val flashColor: Color,
+        val statusColor: Color,
+        val indicatorRunningColor: Color,
+        val indicatorPausedColor: Color,
+        val indicatorStoppedColor: Color
+    )
+
+    val colorSchemes = mapOf(
+        "Dark" to AppColorScheme(
+            name = "Dark",
+            background = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF1A237E), // Blue
+                    Color(0xFF0F0F0F)  // Black
+                )
+            ),
+            cardColor = Color(0xFF212121),
+            timeRunningColor = Color(0xFF4CAF50), // Green
+            timePausedColor = Color(0xFFFFFFFF),  // White
+            timeStoppedColor = Color(0xFFFFFFFF), // White
+            fabColor = Color(0xFF2196F3), // Blue
+            flashColor = Color.Yellow,
+            statusColor = Color(0xFFB3B3B3),
+            indicatorRunningColor = Color(0xFF4CAF50),
+            indicatorPausedColor = Color(0xFFFF9800),
+            indicatorStoppedColor = Color(0xFF757575)
+        ),
+        "Light" to AppColorScheme(
+            name = "Light",
+            background = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFFFFFFF), // White
+                    Color(0xFFF5F5F5)  // Light gray
+                )
+            ),
+            cardColor = Color(0xFFFFFFFF),
+            timeRunningColor = Color(0xFF4CAF50), // Green
+            timePausedColor = Color(0xFF000000),  // Black
+            timeStoppedColor = Color(0xFF000000), // Black
+            fabColor = Color(0xFF009688), // Teal
+            flashColor = Color.Yellow,
+            statusColor = Color(0xFF666666),
+            indicatorRunningColor = Color(0xFF4CAF50),
+            indicatorPausedColor = Color(0xFFFF9800),
+            indicatorStoppedColor = Color(0xFF757575)
+        ),
+        "Solarized" to AppColorScheme(
+            name = "Solarized",
+            background = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF002B36), // Solarized dark
+                    Color(0xFF002B36)
+                )
+            ),
+            cardColor = Color(0xFF073642),
+            timeRunningColor = Color(0xFF2AA198), // Cyan
+            timePausedColor = Color(0xFF93A1A1),  // Base1
+            timeStoppedColor = Color(0xFF93A1A1), // Base1
+            fabColor = Color(0xFF268BD2), // Blue
+            flashColor = Color(0xFFB58900), // Yellow
+            statusColor = Color(0xFF93A1A1),
+            indicatorRunningColor = Color(0xFF2AA198),
+            indicatorPausedColor = Color(0xFFB58900),
+            indicatorStoppedColor = Color(0xFF586E75)
+        ),
+        "Vibrant" to AppColorScheme(
+            name = "Vibrant",
+            background = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF6A1B9A), // Purple
+                    Color(0xFFEC407A)  // Pink
+                )
+            ),
+            cardColor = Color(0xFF4A148C),
+            timeRunningColor = Color(0xFF76FF03), // Lime
+            timePausedColor = Color(0xFFFFFFFF),  // White
+            timeStoppedColor = Color(0xFFFFFFFF), // White
+            fabColor = Color(0xFFF06292), // Pink
+            flashColor = Color(0xFF00BCD4), // Cyan
+            statusColor = Color(0xFFE1BEE7),
+            indicatorRunningColor = Color(0xFF76FF03),
+            indicatorPausedColor = Color(0xFFFF5722),
+            indicatorStoppedColor = Color(0xFF9C27B0)
+        ),
+        "Monochrome" to AppColorScheme(
+            name = "Monochrome",
+            background = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF424242), // Gray
+                    Color(0xFF424242)
+                )
+            ),
+            cardColor = Color(0xFF212121),
+            timeRunningColor = Color(0xFFB0BEC5), // Light gray
+            timePausedColor = Color(0xFFFFFFFF),  // White
+            timeStoppedColor = Color(0xFFFFFFFF), // White
+            fabColor = Color(0xFF757575), // Gray
+            flashColor = Color.White,
+            statusColor = Color(0xFFB0BEC5),
+            indicatorRunningColor = Color(0xFFB0BEC5),
+            indicatorPausedColor = Color(0xFF616161),
+            indicatorStoppedColor = Color(0xFF616161)
+        )
+    )
+
+    val currentScheme = colorSchemes[selectedTheme] ?: colorSchemes["Dark"]!!
 
     // Get context for haptic feedback
     val context = LocalContext.current
@@ -253,12 +380,12 @@ fun StopwatchScreen() {
         }
     }
 
-    // Enhanced animations
+    // Enhanced animations with theme colors
     val timeTextColor by animateColorAsState(
         targetValue = when {
-            isRunning -> Color(0xFF4CAF50) // Green when running
-            pauseStartTime > 0 -> Color(0xFFFF9800) // Orange when paused
-            else -> Color(0xFFFFFFFF) // White when stopped
+            isRunning -> currentScheme.timeRunningColor
+            pauseStartTime > 0 -> currentScheme.timePausedColor
+            else -> currentScheme.timeStoppedColor
         },
         animationSpec = tween(durationMillis = 300),
         label = "time_text_color"
@@ -277,26 +404,56 @@ fun StopwatchScreen() {
     )
 
     val timeTextBackgroundColor by animateColorAsState(
-        targetValue = if (isFlashing) Color.Yellow.copy(alpha = 0.3f) else Color.Transparent,
+        targetValue = if (isFlashing) currentScheme.flashColor.copy(alpha = 0.3f) else Color.Transparent,
         animationSpec = tween(durationMillis = 250),
         label = "time_text_background"
     )
 
-    // Gradient background
-    val gradientBackground = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFF1A1A2E),
-            Color(0xFF16213E),
-            Color(0xFF0F0F0F)
-        )
-    )
+    // Use current theme background
+    val themeBackground = currentScheme.background
 
-    // Enhanced UI with modern design
+    // Enhanced UI with modern design and theme switcher
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(gradientBackground)
+            .background(themeBackground)
     ) {
+        // Theme switcher in top-right corner
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            IconButton(
+                onClick = { showThemeDropdown = true },
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = currentScheme.statusColor
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Theme Settings",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            DropdownMenu(
+                expanded = showThemeDropdown,
+                onDismissRequest = { showThemeDropdown = false }
+            ) {
+                colorSchemes.keys.forEach { themeName ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = themeName,
+                                color = if (themeName == selectedTheme) currentScheme.timeRunningColor else Color.Unspecified
+                            )
+                        },
+                        onClick = { selectTheme(themeName) }
+                    )
+                }
+            }
+        }
         // Main content card - wider to accommodate time display
         Card(
             modifier = Modifier
@@ -305,7 +462,7 @@ fun StopwatchScreen() {
                 .padding(16.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.1f)
+                containerColor = currentScheme.cardColor.copy(alpha = 0.9f)
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
         ) {
@@ -320,7 +477,7 @@ fun StopwatchScreen() {
                         onClick = { showIntervalDropdown = true },
                         modifier = Modifier.padding(bottom = 24.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
+                            contentColor = currentScheme.statusColor
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -365,7 +522,7 @@ fun StopwatchScreen() {
                     text = statusText,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = currentScheme.statusColor,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(top = 16.dp)
                 )
@@ -377,9 +534,9 @@ fun StopwatchScreen() {
                         .size(16.dp)
                         .background(
                             color = when {
-                                isRunning -> Color(0xFF4CAF50)
-                                pauseStartTime > 0 -> Color(0xFFFF9800)
-                                else -> MaterialTheme.colorScheme.outline
+                                isRunning -> currentScheme.indicatorRunningColor
+                                pauseStartTime > 0 -> currentScheme.indicatorPausedColor
+                                else -> currentScheme.indicatorStoppedColor
                             },
                             shape = CircleShape
                         )
@@ -397,8 +554,8 @@ fun StopwatchScreen() {
                 .align(Alignment.BottomEnd)
                 .padding(32.dp)
                 .scale(fabScaleAnimation),
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer
+            containerColor = currentScheme.fabColor,
+            contentColor = Color.White
         ) {
             Icon(
                 imageVector = Icons.Default.Refresh,
