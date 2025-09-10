@@ -4,10 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -15,7 +18,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -48,6 +53,12 @@ fun StopwatchScreen() {
     // Additional state for handling configuration changes properly
     var lastSystemTime by rememberSaveable { mutableStateOf(System.currentTimeMillis()) }
     var accumulatedPauseTime by rememberSaveable { mutableStateOf(0L) }
+
+    // Interval alert feature state
+    var intervalSeconds by rememberSaveable { mutableStateOf(30) } // Default 30 seconds
+    var intervalText by rememberSaveable { mutableStateOf("30") } // Text field input
+    var isFlashing by rememberSaveable { mutableStateOf(false) } // Flash animation state
+    var lastFlashTime by rememberSaveable { mutableStateOf(0L) } // Prevent multiple flashes
 
     // Refined click logic functions with configuration change handling
     fun startTimer() {
@@ -82,6 +93,18 @@ fun StopwatchScreen() {
         totalPausedTime = 0L
         lastSystemTime = System.currentTimeMillis()
         accumulatedPauseTime = 0L
+        isFlashing = false // Clear flash state on reset
+        lastFlashTime = 0L // Reset flash tracking
+    }
+
+    // Handle interval text input
+    fun onIntervalTextChange(newText: String) {
+        intervalText = newText
+        // Update intervalSeconds if the text is a valid number
+        val newInterval = newText.toIntOrNull()
+        if (newInterval != null && newInterval > 0 && newInterval <= 3600) { // Max 1 hour
+            intervalSeconds = newInterval
+        }
     }
 
     // Handle time text click - refined logic
@@ -107,7 +130,23 @@ fun StopwatchScreen() {
             while (isRunning) {
                 delay(100L) // 100ms intervals for smooth millisecond updates
                 elapsedTime += 100L
+
+                // Check for interval milestones and trigger flash (without blocking timer)
+                val intervalMs = intervalSeconds * 1000L
+                if (elapsedTime > 0 && elapsedTime % intervalMs < 100L && elapsedTime != lastFlashTime) {
+                    isFlashing = true
+                    lastFlashTime = elapsedTime
+                    // Note: Flash duration is handled by separate LaunchedEffect below
+                }
             }
+        }
+    }
+
+    // Separate LaunchedEffect to handle flash duration without blocking timer
+    LaunchedEffect(isFlashing) {
+        if (isFlashing) {
+            delay(500L) // 500ms flash duration
+            isFlashing = false
         }
     }
 
@@ -154,10 +193,17 @@ fun StopwatchScreen() {
         }
     }
 
-    // Styled UI with dark theme support
+    // Flash animation - animate background color when interval is reached
+    val animatedBackgroundColor by animateColorAsState(
+        targetValue = if (isFlashing) Color.Yellow else MaterialTheme.colorScheme.surface,
+        animationSpec = tween(durationMillis = 250),
+        label = "flash_animation"
+    )
+
+    // Styled UI with dark theme support and flash animation
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = animatedBackgroundColor // Apply flash animation to background
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -170,6 +216,25 @@ fun StopwatchScreen() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                // Interval input field
+                OutlinedTextField(
+                    value = intervalText,
+                    onValueChange = { onIntervalTextChange(it) },
+                    label = { Text("Interval (seconds)") },
+                    modifier = Modifier
+                        .width(200.dp)
+                        .padding(bottom = 24.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+
                 // Large, bold, centered time display
                 Text(
                     text = formattedTime,
