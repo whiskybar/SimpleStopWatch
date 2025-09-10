@@ -13,9 +13,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -75,7 +78,7 @@ fun StopwatchScreen() {
 
     // Theme selection state
     var selectedTheme by rememberSaveable { mutableStateOf("Dark") }
-    var showThemeDropdown by rememberSaveable { mutableStateOf(false) }
+    var showThemeModal by rememberSaveable { mutableStateOf(false) }
 
     // Refined click logic functions with configuration change handling
     fun startTimer() {
@@ -123,7 +126,7 @@ fun StopwatchScreen() {
     // Handle theme selection
     fun selectTheme(theme: String) {
         selectedTheme = theme
-        showThemeDropdown = false
+        showThemeModal = false
     }
 
     // Define color schemes
@@ -241,6 +244,160 @@ fun StopwatchScreen() {
     )
 
     val currentScheme = colorSchemes[selectedTheme] ?: colorSchemes["Dark"]!!
+
+    // Theme preview card composable
+    @Composable
+    fun ThemePreviewCard(
+        scheme: AppColorScheme,
+        isSelected: Boolean,
+        onThemeSelected: () -> Unit
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .clickable { onThemeSelected() },
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = scheme.cardColor.copy(alpha = 0.9f)
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (isSelected) 8.dp else 4.dp
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(scheme.background)
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Theme name and preview
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = scheme.name,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = scheme.statusColor,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        // Sample time display
+                        Text(
+                            text = "00:00:00.0",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = FontFamily.Monospace,
+                            color = scheme.timeStoppedColor,
+                            modifier = Modifier
+                                .background(
+                                    scheme.flashColor.copy(alpha = 0.1f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+
+                    // Mini FAB preview and selection indicator
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Mini FAB preview
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    scheme.fabColor,
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        // Selection indicator
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = scheme.timeRunningColor,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ModalBottomSheet for theme selection
+    if (showThemeModal) {
+        ModalBottomSheet(
+            onDismissRequest = { showThemeModal = false },
+            containerColor = currentScheme.cardColor.copy(alpha = 0.95f),
+            contentColor = currentScheme.statusColor
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Choose Theme",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = currentScheme.statusColor
+                    )
+
+                    TextButton(
+                        onClick = { showThemeModal = false }
+                    ) {
+                        Text(
+                            text = "Close",
+                            color = currentScheme.timeRunningColor
+                        )
+                    }
+                }
+
+                // Theme previews
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(colorSchemes.keys.toList()) { themeName ->
+                        val scheme = colorSchemes[themeName]!!
+                        ThemePreviewCard(
+                            scheme = scheme,
+                            isSelected = themeName == selectedTheme,
+                            onThemeSelected = { selectTheme(themeName) }
+                        )
+                    }
+                }
+
+                // Bottom padding for navigation bar
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
 
     // Get context for haptic feedback
     val context = LocalContext.current
@@ -419,40 +576,20 @@ fun StopwatchScreen() {
             .background(themeBackground)
     ) {
         // Theme switcher in top-right corner
-        Box(
+        IconButton(
+            onClick = { showThemeModal = true },
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp)
+                .padding(16.dp),
+            colors = IconButtonDefaults.iconButtonColors(
+                contentColor = currentScheme.statusColor
+            )
         ) {
-            IconButton(
-                onClick = { showThemeDropdown = true },
-                colors = IconButtonDefaults.iconButtonColors(
-                    contentColor = currentScheme.statusColor
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Theme Settings",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            DropdownMenu(
-                expanded = showThemeDropdown,
-                onDismissRequest = { showThemeDropdown = false }
-            ) {
-                colorSchemes.keys.forEach { themeName ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = themeName,
-                                color = if (themeName == selectedTheme) currentScheme.timeRunningColor else Color.Unspecified
-                            )
-                        },
-                        onClick = { selectTheme(themeName) }
-                    )
-                }
-            }
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Theme Settings",
+                modifier = Modifier.size(24.dp)
+            )
         }
         // Main content card - wider to accommodate time display
         Card(
