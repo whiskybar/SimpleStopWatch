@@ -7,18 +7,24 @@ import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -31,8 +37,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -68,12 +77,12 @@ fun StopwatchScreen() {
     var accumulatedPauseTime by rememberSaveable { mutableStateOf(0L) }
 
     // Interval alert feature state
-    var intervalSeconds by rememberSaveable { mutableStateOf(30) } // Default 30 seconds
+    var intervalSeconds by rememberSaveable { mutableStateOf<Int?>(30) } // Default 30 seconds, null for disabled
     var isFlashing by rememberSaveable { mutableStateOf(false) } // Flash animation state
     var lastFlashTime by rememberSaveable { mutableStateOf(0L) } // Prevent multiple flashes
 
     // UI enhancement state
-    var showIntervalDropdown by rememberSaveable { mutableStateOf(false) }
+    var showIntervalWidget by rememberSaveable { mutableStateOf(false) } // Widget expansion state
     var fabScale by rememberSaveable { mutableStateOf(1f) }
 
     // Theme selection state
@@ -118,9 +127,27 @@ fun StopwatchScreen() {
     }
 
     // Handle interval selection
-    fun selectInterval(seconds: Int) {
+    fun selectInterval(seconds: Int?) {
         intervalSeconds = seconds
-        showIntervalDropdown = false
+        showIntervalWidget = false
+    }
+
+    // Handle interval increment/decrement
+    fun incrementInterval() {
+        intervalSeconds = (intervalSeconds ?: 0) + 1
+    }
+
+    fun decrementInterval() {
+        val current = intervalSeconds ?: 1
+        if (current > 1) {
+            intervalSeconds = current - 1
+        }
+    }
+
+    // Handle interval disable
+    fun disableInterval() {
+        intervalSeconds = null
+        showIntervalWidget = false
     }
 
     // Handle theme selection
@@ -245,6 +272,10 @@ fun StopwatchScreen() {
 
     val currentScheme = colorSchemes[selectedTheme] ?: colorSchemes["Dark"]!!
 
+    // Custom font families - using the actual font files from the directory
+    val digitalClockFont = FontFamily(Font(R.font.ds_digital, FontWeight.Normal)) // ds_digital.otf
+    val technicalFont = FontFamily(Font(R.font.orbitron, FontWeight.Normal)) // orbitron.ttf
+
     // Theme preview card composable
     @Composable
     fun ThemePreviewCard(
@@ -335,6 +366,229 @@ fun StopwatchScreen() {
                                 tint = scheme.timeRunningColor,
                                 modifier = Modifier.size(24.dp)
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Enhanced interval widget composable
+    @Composable
+    fun IntervalWidget() {
+        var textFieldValue by remember { mutableStateOf(intervalSeconds?.toString() ?: "") }
+
+        // Update text field when interval changes
+        LaunchedEffect(intervalSeconds) {
+            textFieldValue = intervalSeconds?.toString() ?: ""
+        }
+
+        Column(
+            horizontalAlignment = Alignment.End
+        ) {
+            // Collapsed state - FAB-sized button
+            FloatingActionButton(
+                onClick = { showIntervalWidget = !showIntervalWidget },
+                modifier = Modifier.size(56.dp),
+                containerColor = currentScheme.cardColor.copy(alpha = 0.9f),
+                contentColor = currentScheme.statusColor,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp)
+            ) {
+                Text(
+                    text = if (intervalSeconds == null) "OFF" else "${intervalSeconds}s",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = technicalFont,
+                    maxLines = 1
+                )
+            }
+
+            // Expanded state with horizontal layout
+            AnimatedVisibility(
+                visible = showIntervalWidget,
+                enter = expandVertically(animationSpec = tween(300)),
+                exit = shrinkVertically(animationSpec = tween(300))
+            ) {
+                Card(
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .width(300.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = currentScheme.cardColor.copy(alpha = 0.95f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        // Header with close button
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "INTERVAL",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = technicalFont,
+                                color = currentScheme.statusColor
+                            )
+                            IconButton(
+                                onClick = { showIntervalWidget = false },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close",
+                                    tint = currentScheme.statusColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Preset buttons in horizontal scrollable row
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.height(40.dp)
+                        ) {
+                            items(listOf(10, 30, 60)) { seconds ->
+                                OutlinedButton(
+                                    onClick = { selectInterval(seconds) },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = if (intervalSeconds == seconds)
+                                            currentScheme.timeRunningColor
+                                        else currentScheme.statusColor
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(
+                                        text = "${seconds}s",
+                                        fontSize = 12.sp,
+                                        fontFamily = technicalFont,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Plus/minus controls and text field
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Minus button
+                            OutlinedButton(
+                                onClick = { decrementInterval() },
+                                modifier = Modifier.size(40.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = currentScheme.statusColor
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "−",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = technicalFont
+                                )
+                            }
+
+                            // TextField for direct input
+                            OutlinedTextField(
+                                value = textFieldValue,
+                                onValueChange = { newValue ->
+                                    textFieldValue = newValue
+                                    val newInterval = newValue.toIntOrNull()
+                                    if (newInterval != null && newInterval >= 1) {
+                                        intervalSeconds = newInterval
+                                    }
+                                },
+                                modifier = Modifier.width(100.dp),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number
+                                ),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = currentScheme.statusColor,
+                                    unfocusedTextColor = currentScheme.statusColor,
+                                    focusedBorderColor = currentScheme.timeRunningColor,
+                                    unfocusedBorderColor = currentScheme.statusColor
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                singleLine = true,
+                                textStyle = TextStyle(
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center,
+                                    fontFamily = technicalFont,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+
+                            // Plus button
+                            OutlinedButton(
+                                onClick = { incrementInterval() },
+                                modifier = Modifier.size(40.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = currentScheme.statusColor
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "+",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = technicalFont
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Disable and Close buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            OutlinedButton(
+                                onClick = { disableInterval() },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = if (intervalSeconds == null)
+                                        currentScheme.timeRunningColor
+                                    else currentScheme.statusColor
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "DISABLE",
+                                    fontSize = 12.sp,
+                                    fontFamily = technicalFont,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = { showIntervalWidget = false },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = currentScheme.statusColor
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "CLOSE",
+                                    fontSize = 12.sp,
+                                    fontFamily = technicalFont,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -441,11 +695,14 @@ fun StopwatchScreen() {
                 elapsedTime += 100L
 
                 // Check for interval milestones and trigger flash (without blocking timer)
-                val intervalMs = intervalSeconds * 1000L
-                if (elapsedTime > 0 && elapsedTime % intervalMs < 100L && elapsedTime != lastFlashTime) {
-                    isFlashing = true
-                    lastFlashTime = elapsedTime
-                    // Note: Flash duration is handled by separate LaunchedEffect below
+                val currentInterval = intervalSeconds
+                if (currentInterval != null && currentInterval > 0) {
+                    val intervalMs = currentInterval * 1000L
+                    if (elapsedTime > 0 && elapsedTime % intervalMs < 100L && elapsedTime != lastFlashTime) {
+                        isFlashing = true
+                        lastFlashTime = elapsedTime
+                        // Note: Flash duration is handled by separate LaunchedEffect below
+                    }
                 }
             }
         }
@@ -513,12 +770,13 @@ fun StopwatchScreen() {
     }
 
     // Dynamic font size based on screen width and time format
+    // Reduced sizes for LED matrix font (ds_digital.otf) which is wider than monospace
     val baseFontSize = remember(screenWidth) {
         when {
-            screenWidth < 360.dp -> 48.sp // Small screens
-            screenWidth < 400.dp -> 56.sp // Medium-small screens
-            screenWidth < 480.dp -> 64.sp // Medium screens
-            else -> 72.sp // Large screens
+            screenWidth < 360.dp -> 36.sp // Small screens (reduced from 48.sp)
+            screenWidth < 400.dp -> 42.sp // Medium-small screens (reduced from 56.sp)
+            screenWidth < 480.dp -> 48.sp // Medium screens (reduced from 64.sp)
+            else -> 54.sp // Large screens (reduced from 72.sp)
         }
     }
 
@@ -528,7 +786,7 @@ fun StopwatchScreen() {
             val colonCount = formattedTime.count { it == ':' }
             if (colonCount >= 2) { // HH:MM:SS.X format
                 val reducedSize = baseFontSize * 0.85f
-                if (reducedSize < 40.sp) 40.sp else reducedSize
+                if (reducedSize < 32.sp) 32.sp else reducedSize // Reduced minimum from 40.sp to 32.sp
             } else {
                 baseFontSize
             }
@@ -608,45 +866,20 @@ fun StopwatchScreen() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Interval dropdown
-                Box {
-                    OutlinedButton(
-                        onClick = { showIntervalDropdown = true },
-                        modifier = Modifier.padding(bottom = 24.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = currentScheme.statusColor
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Interval: ${intervalSeconds}s")
-                    }
-
-                    DropdownMenu(
-                        expanded = showIntervalDropdown,
-                        onDismissRequest = { showIntervalDropdown = false }
-                    ) {
-                        listOf(10, 30, 60, 120).forEach { seconds ->
-                            DropdownMenuItem(
-                                text = { Text("${seconds}s") },
-                                onClick = { selectInterval(seconds) }
-                            )
-                        }
-                    }
-                }
-
-                // Enhanced time display with monospaced font and animations
+                // Enhanced time display with LED matrix font and animations
                 Text(
                     text = formattedTime,
                     fontSize = timeFontSize,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.Center,
                     color = timeTextColor,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1, // Prevent text wrapping
+                    fontFamily = digitalClockFont, // LED matrix style (ds_digital.otf)
+                    maxLines = 1, // Prevent text wrapping - essential for LED matrix aesthetic
+                    overflow = TextOverflow.Visible, // Ensure full display of LED matrix characters
                     modifier = Modifier
                         .clickable { onTimeClick() }
                         .scale(timeTextScale)
-                        .wrapContentWidth() // Allow text to size itself
+                        .fillMaxWidth() // Take full width to ensure proper centering
                         .background(
                             timeTextBackgroundColor,
                             RoundedCornerShape(16.dp)
@@ -681,24 +914,33 @@ fun StopwatchScreen() {
             }
         }
 
-        // FloatingActionButton for reset
-        FloatingActionButton(
-            onClick = {
-                fabScale = 0.8f
-                resetTimer()
-            },
+        // Bottom controls - Interval widget and FAB in a Row
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(32.dp)
-                .scale(fabScaleAnimation),
-            containerColor = currentScheme.fabColor,
-            contentColor = Color.White
+                .padding(32.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Bottom
         ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Reset Stopwatch",
-                modifier = Modifier.size(24.dp)
-            )
+            // Interval widget
+            IntervalWidget()
+
+            // FloatingActionButton for reset
+            FloatingActionButton(
+                onClick = {
+                    fabScale = 0.8f
+                    resetTimer()
+                },
+                modifier = Modifier.scale(fabScaleAnimation),
+                containerColor = currentScheme.fabColor,
+                contentColor = Color.White
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Reset Stopwatch",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }
