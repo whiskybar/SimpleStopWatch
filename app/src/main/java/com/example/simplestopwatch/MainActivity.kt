@@ -1,16 +1,20 @@
 package com.example.simplestopwatch
 
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -18,10 +22,15 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,9 +65,12 @@ fun StopwatchScreen() {
 
     // Interval alert feature state
     var intervalSeconds by rememberSaveable { mutableStateOf(30) } // Default 30 seconds
-    var intervalText by rememberSaveable { mutableStateOf("30") } // Text field input
     var isFlashing by rememberSaveable { mutableStateOf(false) } // Flash animation state
     var lastFlashTime by rememberSaveable { mutableStateOf(0L) } // Prevent multiple flashes
+
+    // UI enhancement state
+    var showIntervalDropdown by rememberSaveable { mutableStateOf(false) }
+    var fabScale by rememberSaveable { mutableStateOf(1f) }
 
     // Refined click logic functions with configuration change handling
     fun startTimer() {
@@ -97,13 +109,26 @@ fun StopwatchScreen() {
         lastFlashTime = 0L // Reset flash tracking
     }
 
-    // Handle interval text input
-    fun onIntervalTextChange(newText: String) {
-        intervalText = newText
-        // Update intervalSeconds if the text is a valid number
-        val newInterval = newText.toIntOrNull()
-        if (newInterval != null && newInterval > 0 && newInterval <= 3600) { // Max 1 hour
-            intervalSeconds = newInterval
+    // Handle interval selection
+    fun selectInterval(seconds: Int) {
+        intervalSeconds = seconds
+        showIntervalDropdown = false
+    }
+
+    // Get context for haptic feedback
+    val context = LocalContext.current
+
+    // Get screen configuration for responsive design
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    // Haptic feedback function
+    fun triggerHaptic() {
+        try {
+            val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+            vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+        } catch (e: Exception) {
+            // Silently handle any haptic feedback errors
         }
     }
 
@@ -145,8 +170,18 @@ fun StopwatchScreen() {
     // Separate LaunchedEffect to handle flash duration without blocking timer
     LaunchedEffect(isFlashing) {
         if (isFlashing) {
+            // Trigger haptic feedback when flash starts
+            triggerHaptic()
             delay(500L) // 500ms flash duration
             isFlashing = false
+        }
+    }
+
+    // Handle FAB scale animation
+    LaunchedEffect(fabScale) {
+        if (fabScale < 1f) {
+            delay(150L)
+            fabScale = 1f
         }
     }
 
@@ -193,59 +228,136 @@ fun StopwatchScreen() {
         }
     }
 
-    // Flash animation - animate background color when interval is reached
-    val animatedBackgroundColor by animateColorAsState(
-        targetValue = if (isFlashing) Color.Yellow else MaterialTheme.colorScheme.surface,
-        animationSpec = tween(durationMillis = 250),
-        label = "flash_animation"
+    // Dynamic font size based on screen width and time format
+    val baseFontSize = remember(screenWidth) {
+        when {
+            screenWidth < 360.dp -> 48.sp // Small screens
+            screenWidth < 400.dp -> 56.sp // Medium-small screens
+            screenWidth < 480.dp -> 64.sp // Medium screens
+            else -> 72.sp // Large screens
+        }
+    }
+
+    val timeFontSize = remember(baseFontSize, formattedTime) {
+        // Reduce font size if time format includes hours (longer text)
+        if (formattedTime.contains(":")) {
+            val colonCount = formattedTime.count { it == ':' }
+            if (colonCount >= 2) { // HH:MM:SS.X format
+                val reducedSize = baseFontSize * 0.85f
+                if (reducedSize < 40.sp) 40.sp else reducedSize
+            } else {
+                baseFontSize
+            }
+        } else {
+            baseFontSize
+        }
+    }
+
+    // Enhanced animations
+    val timeTextColor by animateColorAsState(
+        targetValue = when {
+            isRunning -> Color(0xFF4CAF50) // Green when running
+            pauseStartTime > 0 -> Color(0xFFFF9800) // Orange when paused
+            else -> Color(0xFFFFFFFF) // White when stopped
+        },
+        animationSpec = tween(durationMillis = 300),
+        label = "time_text_color"
     )
 
-    // Styled UI with dark theme support and flash animation
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = animatedBackgroundColor // Apply flash animation to background
-    ) { innerPadding ->
-        Box(
+    val timeTextScale by animateFloatAsState(
+        targetValue = if (isRunning) 1.02f else 1f,
+        animationSpec = tween(durationMillis = 1000),
+        label = "time_text_scale"
+    )
+
+    val fabScaleAnimation by animateFloatAsState(
+        targetValue = fabScale,
+        animationSpec = tween(durationMillis = 150),
+        label = "fab_scale"
+    )
+
+    val timeTextBackgroundColor by animateColorAsState(
+        targetValue = if (isFlashing) Color.Yellow.copy(alpha = 0.3f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 250),
+        label = "time_text_background"
+    )
+
+    // Gradient background
+    val gradientBackground = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF1A1A2E),
+            Color(0xFF16213E),
+            Color(0xFF0F0F0F)
+        )
+    )
+
+    // Enhanced UI with modern design
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(gradientBackground)
+    ) {
+        // Main content card - wider to accommodate time display
+        Card(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+                .align(Alignment.Center)
+                .fillMaxWidth(0.95f) // Use 95% of screen width
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.1f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
         ) {
-            // Main content - centered time display and status
             Column(
-                modifier = Modifier.align(Alignment.Center),
+                modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Interval input field
-                OutlinedTextField(
-                    value = intervalText,
-                    onValueChange = { onIntervalTextChange(it) },
-                    label = { Text("Interval (seconds)") },
-                    modifier = Modifier
-                        .width(200.dp)
-                        .padding(bottom = 24.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                )
+                // Interval dropdown
+                Box {
+                    OutlinedButton(
+                        onClick = { showIntervalDropdown = true },
+                        modifier = Modifier.padding(bottom = 24.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Interval: ${intervalSeconds}s")
+                    }
 
-                // Large, bold, centered time display
+                    DropdownMenu(
+                        expanded = showIntervalDropdown,
+                        onDismissRequest = { showIntervalDropdown = false }
+                    ) {
+                        listOf(10, 30, 60, 120).forEach { seconds ->
+                            DropdownMenuItem(
+                                text = { Text("${seconds}s") },
+                                onClick = { selectInterval(seconds) }
+                            )
+                        }
+                    }
+                }
+
+                // Enhanced time display with monospaced font and animations
                 Text(
                     text = formattedTime,
-                    fontSize = 72.sp,
+                    fontSize = timeFontSize,
                     fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.displayLarge,
+                    color = timeTextColor,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1, // Prevent text wrapping
                     modifier = Modifier
                         .clickable { onTimeClick() }
-                        .padding(24.dp)
+                        .scale(timeTextScale)
+                        .wrapContentWidth() // Allow text to size itself
+                        .background(
+                            timeTextBackgroundColor,
+                            RoundedCornerShape(16.dp)
+                        )
+                        .padding(horizontal = 16.dp, vertical = 12.dp) // Reduced padding
                 )
 
                 // Status text with improved styling
@@ -258,40 +370,41 @@ fun StopwatchScreen() {
                     modifier = Modifier.padding(top = 16.dp)
                 )
 
-                // Visual indicator for current state
+                // Enhanced visual indicator
                 Box(
                     modifier = Modifier
                         .padding(top = 24.dp)
-                        .size(12.dp)
+                        .size(16.dp)
                         .background(
                             color = when {
-                                isRunning -> MaterialTheme.colorScheme.primary
-                                pauseStartTime > 0 -> MaterialTheme.colorScheme.secondary
+                                isRunning -> Color(0xFF4CAF50)
+                                pauseStartTime > 0 -> Color(0xFFFF9800)
                                 else -> MaterialTheme.colorScheme.outline
                             },
                             shape = CircleShape
                         )
                 )
             }
+        }
 
-            // Reset button positioned at bottom with navigation bar clearance
-            FilledTonalButton(
-                onClick = { resetTimer() },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 32.dp) // 32dp padding to clear navigation bar
-                    .size(56.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Reset Stopwatch",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+        // FloatingActionButton for reset
+        FloatingActionButton(
+            onClick = {
+                fabScale = 0.8f
+                resetTimer()
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(32.dp)
+                .scale(fabScaleAnimation),
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Reset Stopwatch",
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
