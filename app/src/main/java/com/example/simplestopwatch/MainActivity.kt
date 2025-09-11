@@ -32,6 +32,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -386,21 +387,27 @@ fun StopwatchScreen() {
         Column(
             horizontalAlignment = Alignment.End
         ) {
-            // Collapsed state - FAB-sized button
-            FloatingActionButton(
-                onClick = { showIntervalWidget = !showIntervalWidget },
-                modifier = Modifier.size(56.dp),
-                containerColor = currentScheme.cardColor.copy(alpha = 0.9f),
-                contentColor = currentScheme.statusColor,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp)
+            // Collapsed state - FAB-sized button (hidden when expanded)
+            AnimatedVisibility(
+                visible = !showIntervalWidget,
+                enter = expandVertically(animationSpec = tween(300)),
+                exit = shrinkVertically(animationSpec = tween(300))
             ) {
-                Text(
-                    text = if (intervalSeconds == null) "OFF" else "${intervalSeconds}s",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = technicalFont,
-                    maxLines = 1
-                )
+                FloatingActionButton(
+                    onClick = { showIntervalWidget = !showIntervalWidget },
+                    modifier = Modifier.size(56.dp),
+                    containerColor = currentScheme.cardColor.copy(alpha = 0.9f),
+                    contentColor = currentScheme.statusColor,
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp)
+                ) {
+                    Text(
+                        text = if (intervalSeconds == null) "OFF" else "${intervalSeconds}s",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = technicalFont,
+                        maxLines = 1
+                    )
+                }
             }
 
             // Expanded state with horizontal layout
@@ -485,19 +492,31 @@ fun StopwatchScreen() {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Minus button
-                            OutlinedButton(
+                            TextButton(
                                 onClick = { decrementInterval() },
-                                modifier = Modifier.size(40.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        currentScheme.cardColor,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        currentScheme.statusColor,
+                                        RoundedCornerShape(8.dp)
+                                    ),
+                                colors = ButtonDefaults.textButtonColors(
                                     contentColor = currentScheme.statusColor
                                 ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    text = "−",
-                                    fontSize = 14.sp,
+                                    text = "-",
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = technicalFont
+                                    color = currentScheme.statusColor,
+                                    fontFamily = FontFamily.Default,
+                                    textAlign = TextAlign.Center
                                 )
                             }
 
@@ -532,19 +551,31 @@ fun StopwatchScreen() {
                             )
 
                             // Plus button
-                            OutlinedButton(
+                            TextButton(
                                 onClick = { incrementInterval() },
-                                modifier = Modifier.size(40.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        currentScheme.cardColor,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        currentScheme.statusColor,
+                                        RoundedCornerShape(8.dp)
+                                    ),
+                                colors = ButtonDefaults.textButtonColors(
                                     contentColor = currentScheme.statusColor
                                 ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
                                     text = "+",
-                                    fontSize = 14.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = technicalFont
+                                    color = currentScheme.statusColor,
+                                    fontFamily = FontFamily.Default,
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
@@ -659,6 +690,8 @@ fun StopwatchScreen() {
     // Get screen configuration for responsive design
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     // Haptic feedback function
     fun triggerHaptic() {
@@ -914,32 +947,71 @@ fun StopwatchScreen() {
             }
         }
 
-        // Bottom controls - Interval widget and FAB in a Row
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(32.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            // Interval widget
-            IntervalWidget()
-
-            // FloatingActionButton for reset
-            FloatingActionButton(
-                onClick = {
-                    fabScale = 0.8f
-                    resetTimer()
-                },
-                modifier = Modifier.scale(fabScaleAnimation),
-                containerColor = currentScheme.fabColor,
-                contentColor = Color.White
+        // Bottom controls - Interval widget and FAB with responsive positioning
+        if (isLandscape) {
+            // Landscape mode: Stack buttons vertically on the right side
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(
+                        bottom = 16.dp,
+                        end = 32.dp,
+                        top = 16.dp
+                    ),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Reset Stopwatch",
-                    modifier = Modifier.size(24.dp)
-                )
+                // Interval widget
+                IntervalWidget()
+
+                // FloatingActionButton for reset
+                FloatingActionButton(
+                    onClick = {
+                        fabScale = 0.8f
+                        resetTimer()
+                    },
+                    modifier = Modifier.scale(fabScaleAnimation),
+                    containerColor = currentScheme.fabColor,
+                    contentColor = Color.White
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Reset Stopwatch",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        } else {
+            // Portrait mode: Keep buttons horizontally aligned at bottom
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        bottom = 64.dp, // Increased from 32dp to avoid task switcher
+                        end = 32.dp
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                // Interval widget
+                IntervalWidget()
+
+                // FloatingActionButton for reset
+                FloatingActionButton(
+                    onClick = {
+                        fabScale = 0.8f
+                        resetTimer()
+                    },
+                    modifier = Modifier.scale(fabScaleAnimation),
+                    containerColor = currentScheme.fabColor,
+                    contentColor = Color.White
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Reset Stopwatch",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }
