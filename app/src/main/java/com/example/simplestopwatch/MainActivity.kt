@@ -85,6 +85,7 @@ fun StopwatchScreen() {
     // UI enhancement state
     var showIntervalWidget by rememberSaveable { mutableStateOf(false) } // Widget expansion state
     var fabScale by rememberSaveable { mutableStateOf(1f) }
+    var bellEnabled by rememberSaveable { mutableStateOf(false) } // Bell feature state
 
     // Theme selection state
     var selectedTheme by rememberSaveable { mutableStateOf("Dark") }
@@ -149,6 +150,11 @@ fun StopwatchScreen() {
     fun disableInterval() {
         intervalSeconds = null
         showIntervalWidget = false
+    }
+
+    // Handle bell toggle
+    fun toggleBell() {
+        bellEnabled = !bellEnabled
     }
 
     // Handle theme selection
@@ -605,19 +611,21 @@ fun StopwatchScreen() {
                                 )
                             }
 
+                            // Bell toggle button
                             OutlinedButton(
-                                onClick = { showIntervalWidget = false },
+                                onClick = { toggleBell() },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = currentScheme.statusColor
+                                    contentColor = if (bellEnabled)
+                                        currentScheme.timeRunningColor
+                                    else currentScheme.statusColor
                                 ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    text = "CLOSE",
-                                    fontSize = 12.sp,
-                                    fontFamily = technicalFont,
-                                    fontWeight = FontWeight.Bold
+                                    text = if (bellEnabled) "🔔" else "🔕",
+                                    fontSize = 16.sp,
+                                    fontFamily = FontFamily.Default
                                 )
                             }
                         }
@@ -693,13 +701,27 @@ fun StopwatchScreen() {
     val screenHeight = configuration.screenHeightDp.dp
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-    // Haptic feedback function
+    // Haptic feedback and bell function
     fun triggerHaptic() {
         try {
             val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
             vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
         } catch (e: Exception) {
             // Silently handle any haptic feedback errors
+        }
+    }
+
+    // Bell ringing function
+    fun ringBell() {
+        if (bellEnabled) {
+            try {
+                val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+                // Create a longer vibration pattern for bell effect
+                val pattern = longArrayOf(0, 200, 100, 200, 100, 200)
+                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+            } catch (e: Exception) {
+                // Silently handle any bell errors
+            }
         }
     }
 
@@ -744,8 +766,9 @@ fun StopwatchScreen() {
     // Separate LaunchedEffect to handle flash duration without blocking timer
     LaunchedEffect(isFlashing) {
         if (isFlashing) {
-            // Trigger haptic feedback when flash starts
+            // Trigger haptic feedback and bell when flash starts
             triggerHaptic()
+            ringBell()
             delay(500L) // 500ms flash duration
             isFlashing = false
         }
