@@ -894,7 +894,7 @@ fun StopwatchScreen() {
             onClick = { showThemeModal = true },
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp),
+                .padding(32.dp), // Increased from 24dp for maximum edge clearance
             colors = IconButtonDefaults.iconButtonColors(
                 contentColor = currentScheme.statusColor
             )
@@ -909,7 +909,7 @@ fun StopwatchScreen() {
         Card(
             modifier = Modifier
                 .align(Alignment.Center)
-                .fillMaxWidth(0.95f) // Use 95% of screen width
+                .fillMaxWidth(if (isLandscape) 0.7f else 0.95f) // Smaller in landscape mode
                 .padding(16.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
@@ -977,9 +977,9 @@ fun StopwatchScreen() {
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(
-                        bottom = 16.dp,
-                        end = 32.dp,
-                        top = 16.dp
+                        bottom = 32.dp, // Increased from 24dp
+                        end = 48.dp,    // Increased from 40dp
+                        top = 32.dp     // Increased from 24dp
                     ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -1010,8 +1010,8 @@ fun StopwatchScreen() {
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(
-                        bottom = 64.dp, // Increased from 32dp to avoid task switcher
-                        end = 32.dp
+                        bottom = 96.dp, // Increased from 80dp for maximum edge clearance
+                        end = 48.dp     // Increased from 40dp
                     ),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.Bottom

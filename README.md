@@ -11,7 +11,7 @@ Cursor (Pro) to execute the steps.
 
 ## Screenshots
 
-![Screenshot of SimpleStopWatch](screenshots/Screenshot_20250910_214623.png)
+![Screenshot of SimpleStopWatch](screenshots/Screenshot_20250911_210317.png)
 
 The app features a clean, minimalist design with:
 - Large centered time display
