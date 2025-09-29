@@ -97,6 +97,12 @@ fun StopwatchScreen() {
     var triggerAudio by rememberSaveable { mutableStateOf(false) }
     var triggerVibration by rememberSaveable { mutableStateOf(false) }
 
+    // Track interval changes to prevent immediate triggering
+    var lastIntervalValue by rememberSaveable { mutableStateOf(intervalSeconds) }
+
+    // Track the last triggered interval to prevent false triggers on pause/resume
+    var lastTriggeredInterval by rememberSaveable { mutableStateOf(0L) }
+
     // UI enhancement state
     var showIntervalWidget by rememberSaveable { mutableStateOf(false) } // Widget expansion state
     var fabScale by rememberSaveable { mutableStateOf(1f) }
@@ -143,6 +149,8 @@ fun StopwatchScreen() {
         lastFlashTime = 0L // Reset flash tracking
         triggerAudio = false // Clear audio trigger
         triggerVibration = false // Clear vibration trigger
+        lastIntervalValue = intervalSeconds // Reset interval tracking
+        lastTriggeredInterval = 0L // Reset interval trigger tracking
     }
 
     // Handle interval selection
@@ -718,30 +726,30 @@ fun StopwatchScreen() {
     val screenHeight = configuration.screenHeightDp.dp
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-    // Haptic feedback function - optimized for non-blocking operation
+    // Haptic feedback function - completely non-blocking
     fun triggerHaptic() {
-        try {
-            // Always provide haptic feedback (non-blocking)
-            val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-            vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+        // Run all operations in separate coroutines to avoid blocking timer
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Always provide haptic feedback (non-blocking)
+                val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+                vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
 
-            // Also play a subtle short chime if bell is enabled (non-blocking)
-            if (bellEnabled) {
-                try {
-                    val toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 30)
-                    toneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 100)
+                // Also play a subtle short chime if bell is enabled (non-blocking)
+                if (bellEnabled) {
+                    try {
+                        val toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 30)
+                        toneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 100)
 
-                    // Use coroutine scope for non-blocking cleanup
-                    CoroutineScope(Dispatchers.IO).launch {
                         delay(150)
                         toneGenerator.release()
+                    } catch (audioException: Exception) {
+                        // Silently handle audio errors
                     }
-                } catch (audioException: Exception) {
-                    // Silently handle audio errors
                 }
+            } catch (e: Exception) {
+                // Silently handle any haptic feedback errors
             }
-        } catch (e: Exception) {
-            // Silently handle any haptic feedback errors
         }
     }
 
@@ -757,36 +765,36 @@ fun StopwatchScreen() {
         }
     }
 
-    // Bell ringing function - optimized for non-blocking operation
+    // Bell ringing function - completely non-blocking
     fun ringBell() {
         if (bellEnabled) {
-            try {
-                // Check if audio is available (non-blocking check)
-                if (isAudioAvailable()) {
-                    // Use ToneGenerator for a short, clean chime sound (non-blocking)
-                    val toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 50)
-                    toneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200)
+            // Run all operations in separate coroutines to avoid blocking timer
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    // Check if audio is available (non-blocking check)
+                    if (isAudioAvailable()) {
+                        // Use ToneGenerator for a short, clean chime sound (non-blocking)
+                        val toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 50)
+                        toneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200)
 
-                    // Use coroutine scope for non-blocking cleanup
-                    CoroutineScope(Dispatchers.IO).launch {
                         delay(300)
                         toneGenerator.release()
                     }
-                }
 
-                // Always provide haptic feedback for better user experience (non-blocking)
-                val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-                val pattern = longArrayOf(0, 150, 50, 150)
-                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
-
-            } catch (e: Exception) {
-                // Fallback to vibration only if audio fails (non-blocking)
-                try {
+                    // Always provide haptic feedback for better user experience (non-blocking)
                     val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
                     val pattern = longArrayOf(0, 150, 50, 150)
                     vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
-                } catch (vibException: Exception) {
-                    // Silently handle any errors
+
+                } catch (e: Exception) {
+                    // Fallback to vibration only if audio fails (non-blocking)
+                    try {
+                        val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+                        val pattern = longArrayOf(0, 150, 50, 150)
+                        vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                    } catch (vibException: Exception) {
+                        // Silently handle any errors
+                    }
                 }
             }
         }
@@ -830,13 +838,18 @@ fun StopwatchScreen() {
     LaunchedEffect(isRunning, intervalSeconds) {
         if (isRunning && intervalSeconds != null && intervalSeconds!! > 0) {
             val intervalMs = intervalSeconds!! * 1000L
-            var lastTriggeredInterval = 0L
+
+            // Check if interval value changed - if so, reset trigger state
+            if (intervalSeconds != lastIntervalValue) {
+                lastIntervalValue = intervalSeconds
+                lastTriggeredInterval = 0L // Reset to prevent immediate triggering
+            }
 
             while (isRunning) {
                 val currentElapsed = elapsedTime
                 val currentInterval = (currentElapsed / intervalMs).toLong()
 
-                // Trigger if we've crossed into a new interval
+                // Trigger if we've crossed into a new interval (but not on first run after change)
                 if (currentInterval > lastTriggeredInterval && currentElapsed > 0) {
                     isFlashing = true
                     triggerAudio = true
