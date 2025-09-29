@@ -1,5 +1,13 @@
 package com.example.simplestopwatch
 
+import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.media.ToneGenerator
+import android.net.Uri
+import android.provider.Settings
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -85,7 +93,7 @@ fun StopwatchScreen() {
     // UI enhancement state
     var showIntervalWidget by rememberSaveable { mutableStateOf(false) } // Widget expansion state
     var fabScale by rememberSaveable { mutableStateOf(1f) }
-    var bellEnabled by rememberSaveable { mutableStateOf(false) } // Bell feature state
+    var bellEnabled by rememberSaveable { mutableStateOf(true) } // Bell feature state - enabled by default
 
     // Theme selection state
     var selectedTheme by rememberSaveable { mutableStateOf("Dark") }
@@ -701,26 +709,74 @@ fun StopwatchScreen() {
     val screenHeight = configuration.screenHeightDp.dp
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-    // Haptic feedback and bell function
+    // Haptic feedback function - now with optional short chime
     fun triggerHaptic() {
         try {
+            // Always provide haptic feedback
             val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
             vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+
+            // Also play a subtle short chime if bell is enabled
+            if (bellEnabled) {
+                try {
+                    val toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 30) // Lower volume for haptic
+                    toneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 100) // Very short 100ms
+
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        toneGenerator.release()
+                    }, 150)
+                } catch (audioException: Exception) {
+                    // Silently handle audio errors
+                }
+            }
         } catch (e: Exception) {
             // Silently handle any haptic feedback errors
         }
     }
 
-    // Bell ringing function
+    // Check if audio is available and not muted
+    fun isAudioAvailable(): Boolean {
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val ringerMode = audioManager.ringerMode
+            val notificationVolume = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION)
+            ringerMode != AudioManager.RINGER_MODE_SILENT && notificationVolume > 0
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // Bell ringing function - now with short, clean chime
     fun ringBell() {
         if (bellEnabled) {
             try {
+                // Check if audio is available
+                if (isAudioAvailable()) {
+                    // Use ToneGenerator for a short, clean chime sound
+                    val toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 50) // 50% volume
+                    // Play a pleasant chime tone (TONE_CDMA_ALERT_CALL_GUARD = 97)
+                    toneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200) // 200ms duration
+
+                    // Release the tone generator after a short delay
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        toneGenerator.release()
+                    }, 300)
+                }
+
+                // Always provide haptic feedback for better user experience
                 val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-                // Create a longer vibration pattern for bell effect
-                val pattern = longArrayOf(0, 200, 100, 200, 100, 200)
+                val pattern = longArrayOf(0, 150, 50, 150) // Shorter, snappier vibration
                 vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+
             } catch (e: Exception) {
-                // Silently handle any bell errors
+                // Fallback to vibration only if audio fails
+                try {
+                    val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+                    val pattern = longArrayOf(0, 150, 50, 150)
+                    vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                } catch (vibException: Exception) {
+                    // Silently handle any errors
+                }
             }
         }
     }

@@ -5,6 +5,9 @@
     <!-- Permission for haptic feedback -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Permission for audio playback -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
