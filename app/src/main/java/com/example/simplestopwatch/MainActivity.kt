@@ -93,6 +93,10 @@ fun StopwatchScreen() {
     var isFlashing by rememberSaveable { mutableStateOf(false) } // Flash animation state
     var lastFlashTime by rememberSaveable { mutableStateOf(0L) } // Prevent multiple flashes
 
+    // Separate triggers for audio and vibration to ensure perfect synchronization
+    var triggerAudio by rememberSaveable { mutableStateOf(false) }
+    var triggerVibration by rememberSaveable { mutableStateOf(false) }
+
     // UI enhancement state
     var showIntervalWidget by rememberSaveable { mutableStateOf(false) } // Widget expansion state
     var fabScale by rememberSaveable { mutableStateOf(1f) }
@@ -102,7 +106,7 @@ fun StopwatchScreen() {
     var selectedTheme by rememberSaveable { mutableStateOf("Dark") }
     var showThemeModal by rememberSaveable { mutableStateOf(false) }
 
-    // Refined click logic functions with configuration change handling
+    // Refined click logic functions with system-time-based timing
     fun startTimer() {
         isRunning = true
         pauseStartTime = 0L // Reset pause tracking
@@ -137,6 +141,8 @@ fun StopwatchScreen() {
         accumulatedPauseTime = 0L
         isFlashing = false // Clear flash state on reset
         lastFlashTime = 0L // Reset flash tracking
+        triggerAudio = false // Clear audio trigger
+        triggerVibration = false // Clear vibration trigger
     }
 
     // Handle interval selection
@@ -801,41 +807,70 @@ fun StopwatchScreen() {
         }
     }
 
-    // Precise timer logic using LaunchedEffect and Coroutines
-    // Handles configuration changes by using system time as reference
+    // Precise timer logic using system time for accuracy
     LaunchedEffect(isRunning) {
         if (isRunning) {
-            // Main timer loop - updates every 100ms for smooth millisecond display
-            while (isRunning) {
-                delay(100L) // 100ms intervals for smooth millisecond updates
-                elapsedTime += 100L
+            val startTime = System.currentTimeMillis()
+            val startElapsed = elapsedTime
 
-                // Check for interval milestones and trigger flash (without blocking timer)
-                val currentInterval = intervalSeconds
-                if (currentInterval != null && currentInterval > 0) {
-                    val intervalMs = currentInterval * 1000L
-                    if (elapsedTime > 0 && elapsedTime % intervalMs < 100L && elapsedTime != lastFlashTime) {
-                        isFlashing = true
-                        lastFlashTime = elapsedTime
-                        // Note: Flash duration is handled by separate LaunchedEffect below
-                    }
-                }
+            while (isRunning) {
+                val currentTime = System.currentTimeMillis()
+                val newElapsedTime = startElapsed + (currentTime - startTime)
+
+                // Update elapsed time based on actual system time
+                elapsedTime = newElapsedTime
+
+                // Small delay to prevent excessive CPU usage
+                delay(50L) // Reduced delay for better responsiveness
             }
         }
     }
 
-    // Separate LaunchedEffect to handle flash duration without blocking timer
+    // Separate coroutine for interval detection to avoid blocking timer
+    LaunchedEffect(isRunning, intervalSeconds) {
+        if (isRunning && intervalSeconds != null && intervalSeconds!! > 0) {
+            val intervalMs = intervalSeconds!! * 1000L
+            var lastTriggeredInterval = 0L
+
+            while (isRunning) {
+                val currentElapsed = elapsedTime
+                val currentInterval = (currentElapsed / intervalMs).toLong()
+
+                // Trigger if we've crossed into a new interval
+                if (currentInterval > lastTriggeredInterval && currentElapsed > 0) {
+                    isFlashing = true
+                    triggerAudio = true
+                    triggerVibration = true
+                    lastFlashTime = currentElapsed
+                    lastTriggeredInterval = currentInterval
+                }
+
+                delay(100L) // Check every 100ms
+            }
+        }
+    }
+
+    // Separate LaunchedEffect for flash animation (visual only)
     LaunchedEffect(isFlashing) {
         if (isFlashing) {
-            // Trigger haptic feedback and bell asynchronously to avoid blocking timer
-            launch {
-                triggerHaptic()
-            }
-            launch {
-                ringBell()
-            }
             delay(500L) // 500ms flash duration
             isFlashing = false
+        }
+    }
+
+    // Separate LaunchedEffect for audio (completely independent)
+    LaunchedEffect(triggerAudio) {
+        if (triggerAudio) {
+            ringBell()
+            triggerAudio = false
+        }
+    }
+
+    // Separate LaunchedEffect for vibration (completely independent)
+    LaunchedEffect(triggerVibration) {
+        if (triggerVibration) {
+            triggerHaptic()
+            triggerVibration = false
         }
     }
 
