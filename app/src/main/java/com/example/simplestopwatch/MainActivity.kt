@@ -41,7 +41,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -107,6 +110,7 @@ fun StopwatchScreen() {
     var showIntervalWidget by rememberSaveable { mutableStateOf(false) } // Widget expansion state
     var fabScale by rememberSaveable { mutableStateOf(1f) }
     var bellEnabled by rememberSaveable { mutableStateOf(true) } // Bell feature state - enabled by default
+    var vibrationEnabled by rememberSaveable { mutableStateOf(false) } // Vibration feature state - disabled by default
 
     // Theme selection state
     var selectedTheme by rememberSaveable { mutableStateOf("Dark") }
@@ -180,6 +184,11 @@ fun StopwatchScreen() {
     // Handle bell toggle
     fun toggleBell() {
         bellEnabled = !bellEnabled
+    }
+
+    // Handle vibration toggle
+    fun toggleVibration() {
+        vibrationEnabled = !vibrationEnabled
     }
 
     // Handle theme selection
@@ -488,12 +497,15 @@ fun StopwatchScreen() {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Preset buttons in horizontal scrollable row
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.height(40.dp)
+                        // Preset buttons in horizontal row with consistent alignment
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            items(listOf(10, 30, 60)) { seconds ->
+                            listOf(10, 30, 60).forEach { seconds ->
                                 OutlinedButton(
                                     onClick = { selectInterval(seconds) },
                                     colors = ButtonDefaults.outlinedButtonColors(
@@ -519,7 +531,7 @@ fun StopwatchScreen() {
                         // Plus/minus controls and text field
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Minus button
@@ -616,11 +628,14 @@ fun StopwatchScreen() {
                         // Disable and Close buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             OutlinedButton(
                                 onClick = { disableInterval() },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .width(100.dp) // Wider disable button
+                                    .height(40.dp), // Same height as other buttons
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = if (intervalSeconds == null)
                                         currentScheme.timeRunningColor
@@ -630,7 +645,7 @@ fun StopwatchScreen() {
                             ) {
                                 Text(
                                     text = "DISABLE",
-                                    fontSize = 12.sp,
+                                    fontSize = 10.sp, // Smaller text to fit
                                     fontFamily = technicalFont,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -639,7 +654,10 @@ fun StopwatchScreen() {
                             // Bell toggle button
                             OutlinedButton(
                                 onClick = { toggleBell() },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .width(60.dp) // Wider button
+                                    .height(40.dp) // Back to 40dp height
+                                    .padding(end = 4.dp), // Spacing from vibration button
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = if (bellEnabled)
                                         currentScheme.timeRunningColor
@@ -647,10 +665,35 @@ fun StopwatchScreen() {
                                 ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text(
-                                    text = if (bellEnabled) "🔔" else "🔕",
-                                    fontSize = 16.sp,
-                                    fontFamily = FontFamily.Default
+                                Image(
+                                    painter = painterResource(id = if (bellEnabled) R.drawable.ic_bell_on else R.drawable.ic_bell_off),
+                                    contentDescription = if (bellEnabled) "Sound On" else "Sound Off",
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .scale(2.5f) // Scale up 2.5x
+                                )
+                            }
+
+                            // Vibration toggle button
+                            OutlinedButton(
+                                onClick = { toggleVibration() },
+                                modifier = Modifier
+                                    .width(60.dp) // Wider button
+                                    .height(40.dp) // Back to 40dp height
+                                    .padding(start = 4.dp), // Spacing from bell button
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = if (vibrationEnabled)
+                                        currentScheme.timeRunningColor
+                                    else currentScheme.statusColor
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Image(
+                                    painter = painterResource(id = if (vibrationEnabled) R.drawable.ic_vibration_on else R.drawable.ic_vibration_off),
+                                    contentDescription = if (vibrationEnabled) "Vibration On" else "Vibration Off",
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .scale(2.5f) // Scale up 2.5x
                                 )
                             }
                         }
@@ -731,9 +774,11 @@ fun StopwatchScreen() {
         // Run all operations in separate coroutines to avoid blocking timer
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Always provide haptic feedback (non-blocking)
-                val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-                vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+                // Provide haptic feedback only if vibration is enabled (non-blocking)
+                if (vibrationEnabled) {
+                    val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+                    vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+                }
 
                 // Also play a subtle short chime if bell is enabled (non-blocking)
                 if (bellEnabled) {
@@ -781,10 +826,12 @@ fun StopwatchScreen() {
                         toneGenerator.release()
                     }
 
-                    // Always provide haptic feedback for better user experience (non-blocking)
-                    val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-                    val pattern = longArrayOf(0, 150, 50, 150)
-                    vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                    // Provide haptic feedback only if vibration is enabled (non-blocking)
+                    if (vibrationEnabled) {
+                        val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+                        val pattern = longArrayOf(0, 150, 50, 150)
+                        vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                    }
 
                 } catch (e: Exception) {
                     // Fallback to vibration only if audio fails (non-blocking)
