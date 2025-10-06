@@ -379,6 +379,63 @@ fun StopwatchScreen(
             indicatorRunningColor = Color(0xFFB0BEC5),
             indicatorPausedColor = Color(0xFF616161),
             indicatorStoppedColor = Color(0xFF616161)
+        ),
+        "Solarized Light" to AppColorScheme(
+            name = "Solarized Light",
+            background = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFFDF6E3), // Solarized light base
+                    Color(0xFFEEE8D5)  // Solarized light base2
+                )
+            ),
+            cardColor = Color(0xFFFDF6E3),
+            timeRunningColor = Color(0xFF859900), // Solarized green
+            timePausedColor = Color(0xFF586E75),  // Solarized base01
+            timeStoppedColor = Color(0xFF586E75), // Solarized base01
+            fabColor = Color(0xFF268BD2), // Solarized blue
+            flashColor = Color(0xFFB58900), // Solarized yellow
+            statusColor = Color(0xFF657B83), // Solarized base00
+            indicatorRunningColor = Color(0xFF859900),
+            indicatorPausedColor = Color(0xFFB58900),
+            indicatorStoppedColor = Color(0xFF93A1A1)
+        ),
+        "Summer Breeze" to AppColorScheme(
+            name = "Summer Breeze",
+            background = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF87CEEB), // Sky blue
+                    Color(0xFFFFE4B5)  // Moccasin (warm cream)
+                )
+            ),
+            cardColor = Color(0xFFFFF8DC), // Cornsilk
+            timeRunningColor = Color(0xFF32CD32), // Lime green
+            timePausedColor = Color(0xFF2F4F4F),  // Dark slate gray
+            timeStoppedColor = Color(0xFF2F4F4F), // Dark slate gray
+            fabColor = Color(0xFFFF6347), // Tomato
+            flashColor = Color(0xFFFFD700), // Gold
+            statusColor = Color(0xFF4682B4), // Steel blue
+            indicatorRunningColor = Color(0xFF32CD32),
+            indicatorPausedColor = Color(0xFFFF6347),
+            indicatorStoppedColor = Color(0xFF4682B4)
+        ),
+        "Neon Cyber" to AppColorScheme(
+            name = "Neon Cyber",
+            background = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF0A0A0A), // Deep black
+                    Color(0xFF1A0033)  // Dark purple
+                )
+            ),
+            cardColor = Color(0xFF1A1A1A),
+            timeRunningColor = Color(0xFF00FF41), // Bright green
+            timePausedColor = Color(0xFFFF0080),  // Hot pink
+            timeStoppedColor = Color(0xFF00FFFF), // Cyan
+            fabColor = Color(0xFFFF0080), // Hot pink
+            flashColor = Color(0xFFFFFF00), // Bright yellow
+            statusColor = Color(0xFF00FFFF), // Cyan
+            indicatorRunningColor = Color(0xFF00FF41),
+            indicatorPausedColor = Color(0xFFFF0080),
+            indicatorStoppedColor = Color(0xFF00FFFF)
         )
     )
 
