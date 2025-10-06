@@ -1,6 +1,7 @@
 package com.example.simplestopwatch
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
@@ -9,9 +10,11 @@ import android.media.ToneGenerator
 import android.net.Uri
 import android.provider.Settings
 import android.os.Bundle
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -69,17 +72,74 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             SimpleStopWatchTheme {
-                StopwatchScreen()
+                StopwatchScreen(
+                    onTimerStateChanged = { isRunning ->
+                        if (isRunning) {
+                            keepScreenOn()
+                        } else {
+                            allowScreenOff()
+                        }
+                    }
+                )
             }
         }
     }
+
+    private fun keepScreenOn() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun allowScreenOff() {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        allowScreenOff()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        allowScreenOff()
+    }
+}
+
+// Helper class to manage persistent settings
+class AppSettings(private val context: Context) {
+    private val prefs: SharedPreferences = context.getSharedPreferences("stopwatch_settings", Context.MODE_PRIVATE)
+
+    // Theme settings
+    fun saveTheme(theme: String) = prefs.edit().putString("theme", theme).apply()
+    fun getTheme(): String = prefs.getString("theme", "Dark") ?: "Dark"
+
+    // Interval settings
+    fun saveIntervalSeconds(seconds: Int?) = prefs.edit().putInt("interval_seconds", seconds ?: -1).apply()
+    fun getIntervalSeconds(): Int? {
+        val value = prefs.getInt("interval_seconds", 30)
+        return if (value == -1) null else value
+    }
+
+    // Sound settings
+    fun saveBellEnabled(enabled: Boolean) = prefs.edit().putBoolean("bell_enabled", enabled).apply()
+    fun getBellEnabled(): Boolean = prefs.getBoolean("bell_enabled", true)
+
+    // Vibration settings
+    fun saveVibrationEnabled(enabled: Boolean) = prefs.edit().putBoolean("vibration_enabled", enabled).apply()
+    fun getVibrationEnabled(): Boolean = prefs.getBoolean("vibration_enabled", false)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StopwatchScreen() {
+fun StopwatchScreen(
+    onTimerStateChanged: (Boolean) -> Unit = {}
+) {
+    // Get context for SharedPreferences
+    val context = LocalContext.current
+    val settings = remember { AppSettings(context) }
+
     // State management using rememberSaveable for configuration change handling
     // This ensures timer state persists through device rotation and other config changes
     var isRunning by rememberSaveable { mutableStateOf(false) }
@@ -91,8 +151,8 @@ fun StopwatchScreen() {
     var lastSystemTime by rememberSaveable { mutableStateOf(System.currentTimeMillis()) }
     var accumulatedPauseTime by rememberSaveable { mutableStateOf(0L) }
 
-    // Interval alert feature state
-    var intervalSeconds by rememberSaveable { mutableStateOf<Int?>(30) } // Default 30 seconds, null for disabled
+    // Interval alert feature state - load from saved settings
+    var intervalSeconds by rememberSaveable { mutableStateOf<Int?>(settings.getIntervalSeconds()) }
     var isFlashing by rememberSaveable { mutableStateOf(false) } // Flash animation state
     var lastFlashTime by rememberSaveable { mutableStateOf(0L) } // Prevent multiple flashes
 
@@ -109,11 +169,11 @@ fun StopwatchScreen() {
     // UI enhancement state
     var showIntervalWidget by rememberSaveable { mutableStateOf(false) } // Widget expansion state
     var fabScale by rememberSaveable { mutableStateOf(1f) }
-    var bellEnabled by rememberSaveable { mutableStateOf(true) } // Bell feature state - enabled by default
-    var vibrationEnabled by rememberSaveable { mutableStateOf(false) } // Vibration feature state - disabled by default
+    var bellEnabled by rememberSaveable { mutableStateOf(settings.getBellEnabled()) } // Load from saved settings
+    var vibrationEnabled by rememberSaveable { mutableStateOf(settings.getVibrationEnabled()) } // Load from saved settings
 
-    // Theme selection state
-    var selectedTheme by rememberSaveable { mutableStateOf("Dark") }
+    // Theme selection state - load from saved settings
+    var selectedTheme by rememberSaveable { mutableStateOf(settings.getTheme()) }
     var showThemeModal by rememberSaveable { mutableStateOf(false) }
 
     // Refined click logic functions with system-time-based timing
@@ -122,12 +182,14 @@ fun StopwatchScreen() {
         pauseStartTime = 0L // Reset pause tracking
         lastSystemTime = System.currentTimeMillis() // Update reference time
         accumulatedPauseTime = 0L // Reset accumulated pause time
+        onTimerStateChanged(true) // Keep screen on
     }
 
     fun pauseTimer() {
         isRunning = false
         pauseStartTime = System.currentTimeMillis() // Record when pause started
         lastSystemTime = System.currentTimeMillis() // Update reference time
+        onTimerStateChanged(false) // Allow screen to sleep
     }
 
     fun resumeTimer() {
@@ -140,6 +202,7 @@ fun StopwatchScreen() {
         }
         isRunning = true
         lastSystemTime = System.currentTimeMillis() // Update reference time
+        onTimerStateChanged(true) // Keep screen on
     }
 
     fun resetTimer() {
@@ -155,45 +218,53 @@ fun StopwatchScreen() {
         triggerVibration = false // Clear vibration trigger
         lastIntervalValue = intervalSeconds // Reset interval tracking
         lastTriggeredInterval = 0L // Reset interval trigger tracking
+        onTimerStateChanged(false) // Allow screen to sleep
     }
 
     // Handle interval selection
     fun selectInterval(seconds: Int?) {
         intervalSeconds = seconds
+        settings.saveIntervalSeconds(seconds) // Save to persistent storage
         showIntervalWidget = false
     }
 
     // Handle interval increment/decrement
     fun incrementInterval() {
         intervalSeconds = (intervalSeconds ?: 0) + 1
+        settings.saveIntervalSeconds(intervalSeconds) // Save to persistent storage
     }
 
     fun decrementInterval() {
         val current = intervalSeconds ?: 1
         if (current > 1) {
             intervalSeconds = current - 1
+            settings.saveIntervalSeconds(intervalSeconds) // Save to persistent storage
         }
     }
 
     // Handle interval disable
     fun disableInterval() {
         intervalSeconds = null
+        settings.saveIntervalSeconds(null) // Save to persistent storage
         showIntervalWidget = false
     }
 
     // Handle bell toggle
     fun toggleBell() {
         bellEnabled = !bellEnabled
+        settings.saveBellEnabled(bellEnabled) // Save to persistent storage
     }
 
     // Handle vibration toggle
     fun toggleVibration() {
         vibrationEnabled = !vibrationEnabled
+        settings.saveVibrationEnabled(vibrationEnabled) // Save to persistent storage
     }
 
     // Handle theme selection
     fun selectTheme(theme: String) {
         selectedTheme = theme
+        settings.saveTheme(theme) // Save to persistent storage
         showThemeModal = false
     }
 
@@ -760,8 +831,7 @@ fun StopwatchScreen() {
         }
     }
 
-    // Get context for haptic feedback
-    val context = LocalContext.current
+    // Context is already available from above
 
     // Get screen configuration for responsive design
     val configuration = LocalConfiguration.current
