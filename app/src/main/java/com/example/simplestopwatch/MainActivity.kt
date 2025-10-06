@@ -1162,7 +1162,17 @@ fun StopwatchScreen(
     )
 
     val timeTextBackgroundColor by animateColorAsState(
-        targetValue = if (isFlashing) currentScheme.flashColor.copy(alpha = 0.3f) else Color.Transparent,
+        targetValue = if (isFlashing) {
+            // Use inverse of card background color for flash
+            val cardColor = currentScheme.cardColor
+            // Create inverse color by inverting RGB values
+            Color(
+                red = 1f - cardColor.red,
+                green = 1f - cardColor.green,
+                blue = 1f - cardColor.blue,
+                alpha = 0.3f
+            )
+        } else Color.Transparent,
         animationSpec = tween(durationMillis = 250),
         label = "time_text_background"
     )
