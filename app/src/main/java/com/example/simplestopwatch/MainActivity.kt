@@ -1140,7 +1140,8 @@ fun StopwatchScreen(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth(if (isLandscape) 0.7f else 0.95f) // Smaller in landscape mode
-                .padding(16.dp),
+                .padding(16.dp)
+                .clickable { onTimeClick() }, // Make entire card clickable
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = currentScheme.cardColor.copy(alpha = 0.9f)
@@ -1163,7 +1164,6 @@ fun StopwatchScreen(
                     maxLines = 1, // Prevent text wrapping - essential for LED matrix aesthetic
                     overflow = TextOverflow.Visible, // Ensure full display of LED matrix characters
                     modifier = Modifier
-                        .clickable { onTimeClick() }
                         .scale(timeTextScale)
                         .fillMaxWidth() // Take full width to ensure proper centering
                         .background(
