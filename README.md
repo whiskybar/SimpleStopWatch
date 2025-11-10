@@ -82,6 +82,10 @@ The app features a clean, minimalist design with:
 
 This project is open source and available under the MIT License.
 
+## Privacy Policy
+
+
+
 ## App Icon
 
 [Stopwatch icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/stopwatch)
